@@ -1,0 +1,16 @@
+[Unit]
+Description=Mveen Local File Sharing Service
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/mveen/Documents/Sharing
+ExecStart=/usr/bin/node /home/mveen/Documents/Sharing/src/server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=8080
+
+[Install]
+WantedBy=default.target
