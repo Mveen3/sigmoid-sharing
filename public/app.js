@@ -1,9 +1,9 @@
-// Mveen File Share Client
+// Sigmoid Sharing Client
 
 let currentPath = '';
 let allItems = [];
 let selectedPaths = new Set();
-let viewMode = localStorage.getItem('alpha_view_mode') || 'list';
+let viewMode = localStorage.getItem('sigmoid_view_mode') || 'list';
 let currentSort = 'name-asc';
 let searchQuery = '';
 let showHiddenFiles = false;
@@ -31,7 +31,8 @@ const passwordModal = document.getElementById('password-modal');
 const passwordForm = document.getElementById('password-form');
 const passwordMessage = document.getElementById('password-message');
 const showHiddenToggle = document.getElementById('show-hidden-toggle');
-const uploadInput = document.getElementById('upload-input');
+const uploadFilesInput = document.getElementById('upload-files-input');
+const uploadFolderInput = document.getElementById('upload-folder-input');
 
 const dlDrawer = document.getElementById('dl-drawer');
 const dlDrawerStats = document.getElementById('dl-drawer-stats');
@@ -71,8 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-refresh').addEventListener('click', () => loadDirectory(currentPath, false));
     document.getElementById('btn-logout').addEventListener('click', handleLogout);
     document.getElementById('btn-new-folder').addEventListener('click', createDirectory);
-    document.getElementById('btn-upload').addEventListener('click', () => uploadInput.click());
-    uploadInput.addEventListener('change', handleUpload);
+    document.getElementById('btn-upload-files').addEventListener('click', () => uploadFilesInput.click());
+    document.getElementById('btn-upload-folder').addEventListener('click', () => uploadFolderInput.click());
+    uploadFilesInput.addEventListener('change', handleUpload);
+    uploadFolderInput.addEventListener('change', handleUpload);
     showHiddenToggle.addEventListener('change', () => {
         showHiddenFiles = showHiddenToggle.checked;
         const currentHasHiddenPath = currentPath.split('/').some(part => part.startsWith('.'));
@@ -113,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // View mode switcher
 function setViewMode(mode) {
     viewMode = mode;
-    localStorage.setItem('alpha_view_mode', mode);
+    localStorage.setItem('sigmoid_view_mode', mode);
     if (mode === 'list') {
         viewListBtn.classList.add('active');
         viewGridBtn.classList.remove('active');
@@ -192,29 +195,59 @@ async function createDirectory() {
     }
 }
 
-async function handleUpload() {
-    const files = Array.from(uploadInput.files || []);
-    uploadInput.value = '';
+async function handleUpload(event) {
+    const input = event.currentTarget;
+    const isFolderUpload = input === uploadFolderInput;
+    const files = Array.from(input.files || []);
+    input.value = '';
     if (!files.length) return;
 
-    const uploadButton = document.getElementById('btn-upload');
+    const uploadButton = document.getElementById(isFolderUpload ? 'btn-upload-folder' : 'btn-upload-files');
+    const originalButtonText = isFolderUpload ? 'Upload Folder' : 'Upload Files';
+    const ensuredDirectories = new Set();
     uploadButton.disabled = true;
     uploadButton.textContent = `Uploading 0/${files.length}`;
     try {
         for (let index = 0; index < files.length; index += 1) {
             const file = files[index];
-            const query = new URLSearchParams({ path: currentPath });
+            const relativePath = isFolderUpload ? (file.webkitRelativePath || file.name) : file.name;
+            const pathParts = relativePath.split('/').filter(Boolean);
+            if (!pathParts.length || pathParts.some(part => part === '.' || part === '..' || part.includes('\\'))) {
+                throw new Error(`Invalid folder path for ${file.name}.`);
+            }
+
+            const fileName = pathParts.pop();
+            let destinationDirectory = currentPath;
+            for (const directoryName of pathParts) {
+                const parentPath = destinationDirectory;
+                destinationDirectory = parentPath ? `${parentPath}/${directoryName}` : directoryName;
+                if (ensuredDirectories.has(destinationDirectory)) continue;
+
+                const directoryResponse = await fetch('/api/directories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: parentPath, name: directoryName, allowExisting: true })
+                });
+                const directoryResult = await directoryResponse.json();
+                if (directoryResponse.status === 401) return window.location.assign('/login.html');
+                if (!directoryResponse.ok) {
+                    throw new Error(`${relativePath}: ${directoryResult.error || 'Could not create folder.'}`);
+                }
+                ensuredDirectories.add(destinationDirectory);
+            }
+
+            const query = new URLSearchParams({ path: destinationDirectory });
             const res = await fetch(`/api/upload?${query}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/octet-stream',
-                    'X-File-Name': encodeURIComponent(file.name)
+                    'X-File-Name': encodeURIComponent(fileName)
                 },
                 body: file
             });
             const result = await res.json();
             if (res.status === 401) return window.location.assign('/login.html');
-            if (!res.ok) throw new Error(`${file.name}: ${result.error || 'Upload failed.'}`);
+            if (!res.ok) throw new Error(`${relativePath}: ${result.error || 'Upload failed.'}`);
             uploadButton.textContent = `Uploading ${index + 1}/${files.length}`;
         }
         await loadDirectory(currentPath, false);
@@ -223,7 +256,7 @@ async function handleUpload() {
         await loadDirectory(currentPath, false);
     } finally {
         uploadButton.disabled = false;
-        uploadButton.textContent = 'Upload Files';
+        uploadButton.textContent = originalButtonText;
     }
 }
 
@@ -632,7 +665,7 @@ async function handleZipDownload() {
 
     const paths = Array.from(selectedPaths);
     const folderName = currentPath ? currentPath.split('/').pop() : 'files';
-    const zipName = `alpha-${folderName}-${Date.now()}.zip`;
+    const zipName = `sigmoid-sharing-${folderName}-${Date.now()}.zip`;
 
     // Send POST and trigger streaming response download
     try {

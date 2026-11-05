@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mveen File Share</title>
+    <title>Sigmoid Sharing</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
             <a href="/" class="logo-group">
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">
-                    <h1>Mveen File Share</h1>
+                    <h1>Sigmoid Sharing</h1>
                 </div>
             </a>
 
@@ -54,8 +54,10 @@
                 </div>
 
                 <button class="btn-action-small" id="btn-new-folder" type="button">New Folder</button>
-                <button class="btn-action-small" id="btn-upload" type="button">Upload Files</button>
-                <input id="upload-input" type="file" multiple hidden>
+                <button class="btn-action-small" id="btn-upload-files" type="button">Upload Files</button>
+                <button class="btn-action-small" id="btn-upload-folder" type="button">Upload Folder</button>
+                <input id="upload-files-input" type="file" multiple hidden>
+                <input id="upload-folder-input" type="file" webkitdirectory directory multiple hidden>
                 <label class="hidden-toggle" for="show-hidden-toggle">
                     <input id="show-hidden-toggle" type="checkbox">
                     Show hidden files

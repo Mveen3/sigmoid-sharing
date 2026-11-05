@@ -90,7 +90,7 @@ const SECURITY_FILE = path.join(DATA_DIR, 'security.json');
    ===================================================================== */
 if (cluster.isPrimary) {
     console.log(`\n======================================================`);
-    console.log(`  🚀 MVEEN FILE SHARING SERVICE`);
+    console.log(`  🚀 SIGMOID SHARING`);
     console.log(`======================================================`);
     console.log(`  Hardware : ${DEVICE_PROFILE.cpuModel} (${DEVICE_PROFILE.logicalCpuCount} logical CPUs, ${(DEVICE_PROFILE.totalMemoryBytes / 1024 ** 3).toFixed(1)} GB RAM)`);
     console.log(`  Shared Dir: ${SHARED_ROOT}`);
@@ -114,7 +114,7 @@ if (cluster.isPrimary) {
     }
 
     const cleanShutdown = () => {
-        console.log('\n[Master] Gracefully shutting down Mveen File Share...');
+        console.log('\n[Master] Gracefully shutting down Sigmoid Sharing...');
         if (mdns) {
             try { mdns.kill('SIGTERM'); } catch (e) {}
         }
@@ -423,12 +423,20 @@ app.post('/api/directories', authGuard, async (req, res) => {
     try {
         const parentPath = req.body?.path || '';
         const name = validateEntryName(req.body?.name);
+        const allowExisting = req.body?.allowExisting === true;
         const parentAbs = resolveSafePath(parentPath);
         const parentStat = await fs.promises.stat(parentAbs);
         if (!parentStat.isDirectory()) return res.status(400).json({ error: 'Target path is not a directory.' });
 
         const directoryPath = path.join(parentAbs, name);
-        await fs.promises.mkdir(directoryPath);
+        try {
+            await fs.promises.mkdir(directoryPath);
+        } catch (err) {
+            if (err.code !== 'EEXIST' || !allowExisting) throw err;
+            const existingStat = await fs.promises.stat(directoryPath);
+            if (!existingStat.isDirectory()) throw err;
+            return res.json({ success: true, exists: true });
+        }
         return res.status(201).json({ success: true });
     } catch (err) {
         if (err.code === 'EEXIST') return res.status(409).json({ error: 'An item with that name already exists.' });

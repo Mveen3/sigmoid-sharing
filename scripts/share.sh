@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ========================================================
-# Mveen File Share Management Script
+# Sigmoid Sharing Management Script
 # ========================================================
 
 SERVICE_NAME="alpha-share.service"
@@ -18,17 +18,17 @@ install_service() {
 case "$1" in
     start)
         install_service
-        echo "Starting Mveen File Share..."
+        echo "Starting Sigmoid Sharing..."
         systemctl --user start "$SERVICE_NAME"
         systemctl --user status "$SERVICE_NAME" --no-pager
         ;;
     stop)
-        echo "Stopping Mveen File Share..."
+        echo "Stopping Sigmoid Sharing..."
         systemctl --user stop "$SERVICE_NAME"
         ;;
     restart)
         install_service
-        echo "Restarting Mveen File Share..."
+        echo "Restarting Sigmoid Sharing..."
         systemctl --user restart "$SERVICE_NAME"
         systemctl --user status "$SERVICE_NAME" --no-pager
         ;;

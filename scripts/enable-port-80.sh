@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Mveen File Share: Enable Persistent Port 80 Redirect
+# Sigmoid Sharing: Enable Persistent Port 80 Redirect
 # ==============================================================================
 # Allows opening http://<system-name>.local directly in your phone/PC browser
 # without typing ':8080'.
@@ -25,7 +25,7 @@ iptables -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
 # 2. Create a persistent system service to re-apply on boot
 cat << 'EOF' > /etc/systemd/system/alpha-port80.service
 [Unit]
-Description=Mveen File Share Port 80 to 8080 Redirect (Persistent)
+Description=Sigmoid Sharing Port 80 to 8080 Redirect (Persistent)
 After=network.target
 
 [Service]

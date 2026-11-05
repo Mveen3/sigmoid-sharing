@@ -1,4 +1,4 @@
-# Mveen File Share
+# Sigmoid Sharing
 
 A local network file browser for sharing and downloading files across Wi-Fi or a hotspot.
 
@@ -28,7 +28,7 @@ The mDNS publisher advertises the device as `http://<system-name>.local:8080` (f
 - On the first start, the initial password comes from `AUTH_PASS`, or defaults to `patanahi`.
 - Change the password from the signed-in page using **Change Password**. The new salted password hash is stored in `data/security.json`; the old password no longer works after restart.
 - Dot-prefixed files and folders are hidden initially. Turn on **Show hidden files** to view and browse them.
-- Use **New Folder** and **Upload Files** in any open directory. Multiple files can be selected for upload.
+- Use **New Folder**, **Upload Files**, or **Upload Folder** in any open directory. Folder uploads preserve the selected folder and its nested file structure.
 
 The `data/` JSON files contain device-specific or private settings and are excluded from version control. Keep them on the device where the service runs.
 
