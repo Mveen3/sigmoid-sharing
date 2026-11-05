@@ -9,7 +9,7 @@ const { pipeline } = require('stream/promises');
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const SHARED_ROOT = path.resolve(process.env.SHARED_ROOT || os.homedir());
-const USERNAME = process.env.AUTH_USER || 'mveen';
+const DEFAULT_USERNAME = process.env.AUTH_USER || 'sigmoid';
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 
@@ -25,7 +25,7 @@ function loadDeviceProfile() {
     const cpus = os.cpus();
     const detectedProfile = {
         detectedAt: new Date().toISOString(),
-        hostname: os.hostname(),
+        hostname: process.env.SHARE_HOSTNAME || os.hostname(),
         cpuModel: cpus[0]?.model || 'Unknown CPU',
         logicalCpuCount: Math.max(1, cpus.length),
         totalMemoryBytes: os.totalmem()
@@ -56,6 +56,10 @@ function loadSecuritySettings() {
     try {
         const settings = JSON.parse(fs.readFileSync(securityPath, 'utf8'));
         if (settings.passwordSalt && settings.passwordHash && settings.passwordVersion && settings.sessionSecret) {
+            if (typeof settings.username !== 'string' || !settings.username.trim()) {
+                settings.username = DEFAULT_USERNAME;
+                writeJsonFile(securityPath, settings);
+            }
             return settings;
         }
     } catch (err) {
@@ -65,6 +69,7 @@ function loadSecuritySettings() {
     const passwordSalt = crypto.randomBytes(16).toString('hex');
     const initialPassword = process.env.AUTH_PASS || 'patanahi';
     const settings = {
+        username: DEFAULT_USERNAME,
         passwordSalt,
         passwordHash: hashPassword(initialPassword, passwordSalt),
         passwordVersion: crypto.randomUUID(),
@@ -98,7 +103,7 @@ if (cluster.isPrimary) {
     console.log(`  Workers  : ${NUM_WORKERS} worker processes`);
     console.log(`------------------------------------------------------`);
 
-    const hostname = DEVICE_PROFILE.hostname.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '') || 'mveen';
+    const hostname = DEVICE_PROFILE.hostname.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '') || 'sigmoid';
     let mdns = null;
     const mdnsScript = path.join(__dirname, 'mdns_publisher.py');
     if (fs.existsSync(mdnsScript)) {
@@ -204,7 +209,7 @@ function verifySessionToken(token) {
     try {
         const session = JSON.parse(payload);
         const settings = loadSecuritySettings();
-        if (Date.now() > session.expires || session.user !== USERNAME || session.passwordVersion !== settings.passwordVersion) {
+        if (Date.now() > session.expires || session.user !== settings.username || session.passwordVersion !== settings.passwordVersion) {
             return null;
         }
         return session.user;
@@ -222,7 +227,7 @@ function verifyPassword(password, settings) {
 
 // Authentication Middleware
 function authGuard(req, res, next) {
-    const sessionToken = req.signedCookies.alpha_session || req.cookies.alpha_session;
+    const sessionToken = req.signedCookies.sigmoid_session || req.cookies.sigmoid_session;
     const user = verifySessionToken(sessionToken);
     if (user) {
         req.user = user;
@@ -241,6 +246,9 @@ function resolveSafePath(relPath = '') {
     const relative = path.relative(SHARED_ROOT, absolute);
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
         throw new Error('Access denied: Path out of bounds');
+    }
+    if (absolute === SECURITY_FILE || absolute.startsWith(`${SECURITY_FILE}.`)) {
+        throw new Error('Access denied: Private authentication settings');
     }
     return absolute;
 }
@@ -285,10 +293,11 @@ app.post('/api/login', (req, res) => {
     }
 
     const { username, password } = req.body;
-    if (username === USERNAME && verifyPassword(password, loadSecuritySettings())) {
+    const settings = loadSecuritySettings();
+    if (username === settings.username && verifyPassword(password, settings)) {
         failedLoginAttempts.delete(clientIp);
         const token = createSessionToken(username);
-        res.cookie('alpha_session', token, {
+        res.cookie('sigmoid_session', token, {
             httpOnly: true,
             maxAge: 30 * 24 * 60 * 60 * 1000,
             sameSite: 'lax',
@@ -313,7 +322,7 @@ app.post('/api/login', (req, res) => {
 
 // Auth API: Logout
 app.post('/api/logout', (req, res) => {
-    res.clearCookie('alpha_session', { path: '/' });
+    res.clearCookie('sigmoid_session', { path: '/' });
     res.json({ success: true });
 });
 
@@ -338,8 +347,32 @@ app.post('/api/change-password', authGuard, (req, res) => {
         passwordHash: hashPassword(newPassword, passwordSalt),
         passwordVersion: crypto.randomUUID()
     });
-    res.clearCookie('alpha_session', { path: '/' });
+    res.clearCookie('sigmoid_session', { path: '/' });
     return res.json({ success: true, message: 'Password changed. Please sign in again.' });
+});
+
+app.post('/api/change-username', authGuard, (req, res) => {
+    const { currentPassword, newUsername } = req.body || {};
+    const currentSettings = loadSecuritySettings();
+    const normalizedUsername = typeof newUsername === 'string' ? newUsername.trim() : '';
+
+    if (!verifyPassword(currentPassword, currentSettings)) {
+        return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/.test(normalizedUsername)) {
+        return res.status(400).json({ error: 'Username must be 3–32 characters and use only letters, numbers, dots, underscores, or hyphens.' });
+    }
+    if (normalizedUsername === currentSettings.username) {
+        return res.status(400).json({ error: 'Choose a username different from the current username.' });
+    }
+
+    writeJsonFile(SECURITY_FILE, {
+        ...currentSettings,
+        username: normalizedUsername,
+        passwordVersion: crypto.randomUUID()
+    });
+    res.clearCookie('sigmoid_session', { path: '/' });
+    return res.json({ success: true, message: 'Username changed. Please sign in with your new username.' });
 });
 
 // Protected main route
@@ -371,6 +404,7 @@ app.get('/api/browse', authGuard, async (req, res) => {
             if (entry.isSymbolicLink()) continue;
 
             const itemAbs = path.join(absPath, entry.name);
+            if (itemAbs === SECURITY_FILE || itemAbs.startsWith(`${SECURITY_FILE}.`)) continue;
             const itemRel = path.relative(SHARED_ROOT, itemAbs);
 
             try {

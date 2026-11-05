@@ -13,7 +13,7 @@ from gi.repository import GLib
 
 HOSTNAME = (sys.argv[1] if len(sys.argv) > 1 else socket.gethostname())
 HOSTNAME = HOSTNAME.lower().removesuffix(".local")
-HOSTNAME = "".join(char if char.isalnum() or char == "-" else "-" for char in HOSTNAME).strip("-") or "mveen"
+HOSTNAME = "".join(char if char.isalnum() or char == "-" else "-" for char in HOSTNAME).strip("-") or "sigmoid"
 MDNS_NAME = f"{HOSTNAME}.local"
 
 logging.basicConfig(
@@ -35,14 +35,10 @@ def get_active_ipv4_interfaces():
     """Detect all active non-loopback network interfaces and their IPv4 addresses."""
     interfaces = []
     try:
-        with open("/proc/net/dev", "r") as f:
-            lines = f.readlines()[2:]
-        for line in lines:
-            iface_name = line.split(":")[0].strip()
+        for iface_idx, iface_name in socket.if_nameindex():
             if iface_name == "lo" or iface_name.startswith("docker"):
                 continue
             try:
-                iface_idx = socket.if_nametoindex(iface_name)
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 ip = socket.inet_ntoa(fcntl.ioctl(
                     s.fileno(),
@@ -57,7 +53,7 @@ def get_active_ipv4_interfaces():
     except Exception as e:
         logging.warning("Error reading interfaces: %s", e)
 
-    # Fallback to default route socket if proc net dev failed
+    # Fall back to the default route if no active interfaces were found.
     if not interfaces:
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

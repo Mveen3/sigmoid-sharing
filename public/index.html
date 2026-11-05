@@ -19,19 +19,21 @@
 
             <!-- Navigation Actions -->
             <div class="nav-actions">
-                <button class="btn-action-small" id="btn-change-password" title="Change account password">
-                    Change Password
-                </button>
                 <button class="btn-icon" id="btn-refresh" title="Refresh Directory">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                 </button>
-                <button class="btn-icon" id="btn-logout" title="Sign Out">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                    </svg>
-                </button>
+                <div class="settings-control" id="settings-control">
+                    <button class="btn-icon" id="btn-settings" type="button" title="Settings" aria-label="Settings" aria-controls="settings-menu" aria-expanded="false">
+                        <span aria-hidden="true">⚙</span>
+                    </button>
+                    <div class="settings-menu" id="settings-menu" aria-label="Account settings" hidden>
+                        <button class="settings-menu-item" id="btn-change-password" type="button">Change Password</button>
+                        <button class="settings-menu-item" id="btn-change-username" type="button">Change Username</button>
+                        <button class="settings-menu-item" id="btn-logout" type="button">Log Out</button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -155,6 +157,26 @@
                     <input class="settings-input" id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required>
                     <p id="password-message" class="form-message" role="status"></p>
                     <button class="btn-submit" type="submit">Update Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Username Modal -->
+    <div class="modal-overlay" id="username-modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Change Username</h3>
+                <button class="modal-close" id="username-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="username-form" class="settings-form">
+                    <label for="username-current-password">Current password</label>
+                    <input class="settings-input" id="username-current-password" name="currentPassword" type="password" autocomplete="current-password" required>
+                    <label for="new-username">New username</label>
+                    <input class="settings-input" id="new-username" name="newUsername" type="text" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" title="Use 3–32 letters, numbers, dots, underscores, or hyphens." required>
+                    <p id="username-message" class="form-message" role="status"></p>
+                    <button class="btn-submit" type="submit">Update Username</button>
                 </form>
             </div>
         </div>

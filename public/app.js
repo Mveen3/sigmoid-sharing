@@ -30,6 +30,12 @@ const previewClose = document.getElementById('preview-close');
 const passwordModal = document.getElementById('password-modal');
 const passwordForm = document.getElementById('password-form');
 const passwordMessage = document.getElementById('password-message');
+const usernameModal = document.getElementById('username-modal');
+const usernameForm = document.getElementById('username-form');
+const usernameMessage = document.getElementById('username-message');
+const settingsControl = document.getElementById('settings-control');
+const settingsButton = document.getElementById('btn-settings');
+const settingsMenu = document.getElementById('settings-menu');
 const showHiddenToggle = document.getElementById('show-hidden-toggle');
 const uploadFilesInput = document.getElementById('upload-files-input');
 const uploadFolderInput = document.getElementById('upload-folder-input');
@@ -70,7 +76,23 @@ document.addEventListener('DOMContentLoaded', () => {
     btnZipDl.addEventListener('click', handleZipDownload);
 
     document.getElementById('btn-refresh').addEventListener('click', () => loadDirectory(currentPath, false));
-    document.getElementById('btn-logout').addEventListener('click', handleLogout);
+    settingsButton.addEventListener('click', () => {
+        const isOpening = settingsMenu.hidden;
+        settingsMenu.hidden = !isOpening;
+        settingsButton.setAttribute('aria-expanded', String(isOpening));
+    });
+    document.addEventListener('click', (event) => {
+        if (!settingsControl.contains(event.target)) closeSettingsMenu();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !settingsMenu.hidden) {
+            closeSettingsMenu(true);
+        }
+    });
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        closeSettingsMenu();
+        handleLogout();
+    });
     document.getElementById('btn-new-folder').addEventListener('click', createDirectory);
     document.getElementById('btn-upload-files').addEventListener('click', () => uploadFilesInput.click());
     document.getElementById('btn-upload-folder').addEventListener('click', () => uploadFolderInput.click());
@@ -83,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('btn-change-password').addEventListener('click', () => {
+        closeSettingsMenu();
         passwordMessage.textContent = '';
         passwordMessage.className = 'form-message';
         passwordForm.reset();
@@ -90,6 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('password-close').addEventListener('click', () => passwordModal.classList.remove('active'));
     passwordForm.addEventListener('submit', handleChangePassword);
+    document.getElementById('btn-change-username').addEventListener('click', () => {
+        closeSettingsMenu();
+        usernameMessage.textContent = '';
+        usernameMessage.className = 'form-message';
+        usernameForm.reset();
+        usernameModal.classList.add('active');
+    });
+    document.getElementById('username-close').addEventListener('click', () => usernameModal.classList.remove('active'));
+    usernameForm.addEventListener('submit', handleChangeUsername);
     previewClose.addEventListener('click', () => {
         previewModal.classList.remove('active');
         previewBody.innerHTML = '';
@@ -104,6 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === passwordModal) {
             passwordModal.classList.remove('active');
         }
+        if (e.target === usernameModal) {
+            usernameModal.classList.remove('active');
+        }
     });
 
     // History popstate
@@ -112,6 +147,12 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDirectory(path, false);
     });
 });
+
+function closeSettingsMenu(returnFocus = false) {
+    settingsMenu.hidden = true;
+    settingsButton.setAttribute('aria-expanded', 'false');
+    if (returnFocus) settingsButton.focus();
+}
 
 // View mode switcher
 function setViewMode(mode) {
@@ -289,6 +330,32 @@ async function handleChangePassword(event) {
     } catch (err) {
         passwordMessage.textContent = err.message;
         passwordMessage.classList.add('error');
+    }
+}
+
+async function handleChangeUsername(event) {
+    event.preventDefault();
+    usernameMessage.className = 'form-message';
+
+    try {
+        const res = await fetch('/api/change-username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                currentPassword: document.getElementById('username-current-password').value,
+                newUsername: document.getElementById('new-username').value
+            })
+        });
+        const result = await res.json();
+        if (res.status === 401 && result.error === 'Unauthorized. Please login.') {
+            return window.location.assign('/login.html');
+        }
+        if (!res.ok) throw new Error(result.error || 'Could not change username.');
+        window.alert(result.message);
+        window.location.assign('/login.html');
+    } catch (err) {
+        usernameMessage.textContent = err.message;
+        usernameMessage.classList.add('error');
     }
 }
 

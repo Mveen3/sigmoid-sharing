@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/mveen/Documents/sigmoid-sharing
-ExecStart=/usr/bin/node /home/mveen/Documents/sigmoid-sharing/src/server.js
+WorkingDirectory=@PROJECT_DIR@
+ExecStart=@NODE_BINARY@ src/server.js
 Restart=always
 RestartSec=3
 Environment=NODE_ENV=production

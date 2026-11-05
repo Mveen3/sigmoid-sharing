@@ -15,15 +15,22 @@ fi
 
 echo "Setting up persistent port 80 redirect..."
 
-# 1. Apply iptables rules immediately
-iptables -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null || \
-iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
+SYSTEMD_UNIT_DIR="$(systemd-path systemd-system-conf)"
+IPTABLES_BIN="$(command -v iptables)"
+if [ -z "$SYSTEMD_UNIT_DIR" ] || [ -z "$IPTABLES_BIN" ]; then
+  echo "Could not locate the systemd service directory or iptables executable."
+  exit 1
+fi
 
-iptables -t nat -C OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null || \
-iptables -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
+# 1. Apply iptables rules immediately
+"$IPTABLES_BIN" -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null || \
+"$IPTABLES_BIN" -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
+
+"$IPTABLES_BIN" -t nat -C OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null || \
+"$IPTABLES_BIN" -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
 
 # 2. Create a persistent system service to re-apply on boot
-cat << 'EOF' > /etc/systemd/system/alpha-port80.service
+cat << 'EOF' > "$SYSTEMD_UNIT_DIR/sigmoid-port80.service"
 [Unit]
 Description=Sigmoid Sharing Port 80 to 8080 Redirect (Persistent)
 After=network.target
@@ -31,18 +38,18 @@ After=network.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
-ExecStart=/sbin/iptables -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
-ExecStop=/sbin/iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
-ExecStop=/sbin/iptables -t nat -D OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
+ExecStart=sh -c 'iptables -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080 || iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080'
+ExecStart=sh -c 'iptables -t nat -C OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080 || iptables -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080'
+ExecStop=-iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080
+ExecStop=-iptables -t nat -D OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-port 8080
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable alpha-port80.service
-systemctl start alpha-port80.service
+systemctl enable sigmoid-port80.service
+systemctl start sigmoid-port80.service
 
 echo ""
 echo "✅ SUCCESS! Port 80 redirect is now active and will survive laptop reboots."
